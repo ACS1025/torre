@@ -1,0 +1,74 @@
+/* Shared visual language for the operational views. */
+.legacy-page{
+  --modern-bg:#080d12;
+  --modern-panel:rgba(16,23,31,.78);
+  --modern-panel-strong:rgba(21,30,40,.9);
+  --modern-border:rgba(157,181,202,.16);
+  --modern-border-strong:rgba(157,181,202,.3);
+  --modern-shadow:0 24px 60px rgba(0,0,0,.28);
+  background:
+    radial-gradient(850px 600px at 8% 0%,rgba(52,112,160,.2),transparent 65%),
+    radial-gradient(800px 600px at 95% 5%,rgba(75,61,142,.18),transparent 62%),
+    var(--modern-bg);
+  color:var(--text);
+}
+html[data-theme="light"] .legacy-page{--modern-bg:#e9eef1;--modern-panel:rgba(255,255,255,.76);--modern-panel-strong:rgba(255,255,255,.94);--modern-border:rgba(34,56,75,.14);--modern-border-strong:rgba(34,56,75,.25);--modern-shadow:0 20px 50px rgba(43,61,78,.14)}
+.legacy-page .shell,.legacy-page .app-shell{gap:16px;padding:16px;min-height:100vh}
+.legacy-page .nav-sidebar,.legacy-page .tools-sidebar,.legacy-page .panel,.legacy-page .kpi,.legacy-page .grid,.legacy-page .filters,.legacy-page .topbar,.legacy-page .kpis{
+  border-color:var(--modern-border);
+}
+.legacy-page .nav-sidebar,.legacy-page .tools-sidebar{
+  background:var(--modern-panel);
+  border:1px solid var(--modern-border);
+  border-radius:16px;
+  box-shadow:var(--modern-shadow),inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter:blur(24px) saturate(140%);
+  -webkit-backdrop-filter:blur(24px) saturate(140%);
+}
+.legacy-page .nav-sidebar{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto}
+.legacy-page .tools-sidebar{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto}
+.legacy-page .brand{padding:0 20px 18px;border-color:var(--modern-border)}
+.legacy-page .nav-group{padding:0 12px;margin-bottom:18px}
+.legacy-page .nav-item{padding:10px;border:1px solid transparent;border-radius:9px;transition:.2s ease}
+.legacy-page .nav-item:hover:not(.disabled){background:var(--modern-panel-strong);border-color:var(--modern-border)}
+.legacy-page .nav-item.active{background:var(--modern-panel-strong);border-color:var(--modern-border-strong);border-left-color:var(--accent)}
+.legacy-page .main,.legacy-page main{padding:8px 16px 24px}
+.legacy-page .topbar{padding:8px 4px 18px;margin-bottom:0}
+.legacy-page .topbar h1{letter-spacing:-.02em}
+.legacy-page .actions{gap:8px}
+.legacy-page button,.legacy-page select,.legacy-page input{
+  border-color:var(--modern-border-strong);
+  border-radius:9px;
+  transition:border-color .2s ease,background .2s ease,transform .2s ease;
+}
+.legacy-page button:hover,.legacy-page select:hover{background:var(--modern-panel-strong);border-color:var(--accent)}
+.legacy-page button.primary{box-shadow:0 8px 22px rgba(102,174,219,.18)}
+.legacy-page .panel,.legacy-page .kpi,.legacy-page .grid,.legacy-page .filters,.legacy-page .kpis{
+  background:var(--modern-panel);
+  box-shadow:var(--modern-shadow),inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter:blur(20px) saturate(135%);
+  -webkit-backdrop-filter:blur(20px) saturate(135%);
+}
+.legacy-page .panel{border-radius:14px;margin:12px 0;padding:24px}
+.legacy-page .filters{border-radius:14px;padding:16px 18px;margin:12px 0}
+.legacy-page .kpis{border-radius:14px;overflow:hidden;margin:12px 0}
+.legacy-page .kpi{padding:20px}
+.legacy-page .kpi strong,.legacy-page .kpi .value{letter-spacing:-.03em}
+.legacy-page .grid{border-radius:14px;overflow:hidden;margin-top:12px}
+.legacy-page .grid .panel{border-radius:0;box-shadow:none;background:transparent;margin:0}
+.legacy-page table tbody tr{transition:background .15s ease}
+.legacy-page table tbody tr:hover{background:rgba(102,174,219,.08)}
+.legacy-page .tool-btn{border-radius:10px;background:var(--modern-panel);border-color:var(--modern-border);transition:.2s ease}
+.legacy-page .tool-btn:hover{background:var(--modern-panel-strong);border-color:var(--accent);transform:translateY(-1px)}
+.legacy-page .status-box{box-shadow:0 8px 24px rgba(79,169,140,.08)}
+.legacy-page :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media (max-width:980px){
+  .legacy-page .shell,.legacy-page .app-shell{padding:12px;display:block}
+  .legacy-page .nav-sidebar,.legacy-page .tools-sidebar{position:static;max-height:none;border-radius:14px}
+  .legacy-page .main,.legacy-page main{padding:12px 0 20px}
+  .legacy-page .topbar{padding:4px 4px 16px}
+  .legacy-page .panel{padding:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  .legacy-page *{transition:none!important}
+}
