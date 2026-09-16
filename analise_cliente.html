@@ -51,18 +51,58 @@ function dateBR(value){
   if(typeof value==='number'){
     const base=new Date(Date.UTC(1899,11,30));
     const date=new Date(base.getTime()+value*86400000);
-    return Number.isNaN(date.getTime())?null:new Date(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate(),Math.round((value%1)*24),0,0);
+    return Number.isNaN(date.getTime())?null:new Date(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate(),Math.floor((value%1)*24),Math.floor((value%1)*1440)%60,Math.floor((value%1)*86400)%60);
   }
   const text=String(value).trim();
   const m=text.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if(m)return new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0));
   const fallback=new Date(text);return text&&!Number.isNaN(fallback.getTime())?fallback:null;
 }
-function normalizeHeader(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
-function indexCols(cols){const normalized=cols.map(normalizeHeader);const find=aliases=>{const normalizedAliases=aliases.map(normalizeHeader);return normalized.findIndex(c=>normalizedAliases.includes(c))};return {status:find(['status','status consulta','status da consulta','situação']),client:find(['razão social cliente','razao social cliente','cliente','razão social','nome cliente']),date:find(['data consulta','data da consulta','data de consulta']),protocol:find(['protocolo','número protocolo','numero protocolo']),response:find(['data resposta','data da resposta','data de resposta'])}}
+const FIELD_HEADERS={
+  status:['status','status consulta','status da consulta','situação','situacao'],
+  client:['razão social cliente','razao social cliente','cliente','razão social','razao social','nome cliente'],
+  date:['data consulta','data da consulta','data de consulta','data consulta veículo','data consulta veiculo'],
+  protocol:['protocolo','número protocolo','numero protocolo'],
+  response:['data resposta','data da resposta','data de resposta','data resposta consulta']
+};
+function normalizeHeader(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' e ').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
+function findHeaderIndex(headerRow,aliases){
+  if(!Array.isArray(headerRow))return -1;
+  const normalizedAliases=aliases.map(normalizeHeader).filter(Boolean);
+  for(let i=0;i<headerRow.length;i++)if(normalizedAliases.includes(normalizeHeader(headerRow[i])))return i;
+  const candidates=[];
+  for(let i=0;i<headerRow.length;i++){
+    const header=normalizeHeader(headerRow[i]);
+    if(!header)continue;
+    if(normalizedAliases.some(alias=>header.startsWith(alias+' ')||header.endsWith(' '+alias)||header.includes(' '+alias+' ')))candidates.push(i);
+  }
+  return candidates.length===1?candidates[0]:-1;
+}
+function indexCols(cols){return Object.fromEntries(Object.entries(FIELD_HEADERS).map(([key,aliases])=>[key,findHeaderIndex(cols,aliases)]))}
+function canonicalStatus(value){
+  const status=normalizeHeader(value);
+  if(status==='apto')return 'Apto';
+  if(status==='consulta vencida'||status==='vencida')return 'Consulta vencida';
+  if(status==='aguardando'||status==='aguardando analise')return 'Aguardando';
+  if(status==='avaliacao concluida')return 'Avaliação concluída';
+  return String(value??'').trim();
+}
 const REEVALUATION_STATUSES=new Set(['Aguardando','Avaliação concluída','Consulta vencida']);
 function deduplicate(rows){const result=[],latest=new Map();rows.forEach(row=>{if(!REEVALUATION_STATUSES.has(row.status)||!row.protocol){result.push(row);return}const current=latest.get(row.protocol);if(!current){latest.set(row.protocol,row);return}if(row.response&&( !current.response||row.response>current.response))latest.set(row.protocol,row)});return result.concat(latest.values())}
-function normalize(payload){if(!payload||!Array.isArray(payload.cols)||!Array.isArray(payload.rows))throw new Error('Resposta da API sem cols/rows.');const idx=indexCols(payload.cols);if(idx.status<0||idx.client<0||idx.date<0)throw new Error('A API não contém as colunas necessárias para análise por cliente.');const rows=payload.rows.map(row=>({status:String(row[idx.status]??'').trim(),client:String(row[idx.client]??'').trim()||'Não informado',date:dateBR(row[idx.date]),protocol:idx.protocol>-1?String(row[idx.protocol]??'').trim():'',response:idx.response>-1?dateBR(row[idx.response]):null})).filter(row=>row.date instanceof Date&&!Number.isNaN(row.date.getTime())&&row.status);return deduplicate(rows)}
+function normalize(payload){
+  if(!payload||!Array.isArray(payload.cols)||!Array.isArray(payload.rows))throw new Error('Resposta da API sem cols/rows.');
+  const idx=indexCols(payload.cols);
+  const missing=['status','client','date'].filter(key=>idx[key]<0);
+  if(missing.length)throw new Error('A API não contém as colunas necessárias para análise por cliente: '+missing.join(', ')+'.');
+  const rows=payload.rows.map(row=>({
+    status:canonicalStatus(row[idx.status]),
+    client:String(row[idx.client]??'').trim()||'Não informado',
+    date:dateBR(row[idx.date]),
+    protocol:idx.protocol>-1?String(row[idx.protocol]??'').trim():'',
+    response:idx.response>-1?dateBR(row[idx.response]):null
+  })).filter(row=>row.date instanceof Date&&!Number.isNaN(row.date.getTime())&&row.status);
+  return deduplicate(rows);
+}
 function scheduleAutoRefresh(){if(autoRefreshTimer)clearInterval(autoRefreshTimer);autoRefreshTimer=setInterval(()=>{console.log('[Torre] Atualização automática por cliente...');load();},AUTO_REFRESH_MS)}
 async function getApiPayload(){
   if(typeof google!=='undefined'&&google.script&&google.script.run){
