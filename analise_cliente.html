@@ -41,7 +41,7 @@ main{grid-column:2/3;padding:24px 32px}.topbar{display:flex;justify-content:spac
 <aside class="tools-sidebar"><div class="tools-label">Ferramentas</div><a class="tool-btn" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>Central</a><a class="tool-btn" href="analise_veiculo.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 18V7l9-4 9 4v11"/><path d="M7 9.5h10"/><path d="M7 13h10"/></svg>Veículo</a></aside>
 </div><div id="toast" class="toast"></div>
 <script>
-const API_URL='https://script.google.com/macros/s/AKfycbzDkYy6bKno8EHs05CWztRtWsQOS8qCnHDw9uF6KCQNv-tBcpTzOA-Arlh7TAug2WU/exec';
+const API_URL='https://script.google.com/macros/s/AKfycbyMQgjPNQ7fcJgEezUHm3rd699qoqC0bXWuEVHDZHDVGvb2as45fy5TwLp1o4eJcB6v/exec';
 let DATA=[], charts={}, autoRefreshTimer=null, loading=false;
 const AUTO_REFRESH_MS = 300000;
 const $=id=>document.getElementById(id);
@@ -111,8 +111,7 @@ async function getApiPayload(){
   const controller=new AbortController();
   const timeoutId=setTimeout(()=>controller.abort(),600000);
   try{
-    const separator=API_URL.includes('?')?'&':'?';
-    const res=await fetch(API_URL+separator+'_='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller.signal});
+    const res=await fetch(API_URL,{redirect:'follow',cache:'no-store',signal:controller.signal});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const text=await res.text();
     if(!text.trim())throw new Error('Resposta vazia da API.');
