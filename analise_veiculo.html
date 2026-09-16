@@ -966,9 +966,11 @@ async function loadFromAPI(){
   const timeoutId = setTimeout(() => controller.abort(), 600000);
 
   try {
-    const res = await fetch(API_URL, {
+    const separator = API_URL.includes('?') ? '&' : '?';
+    const res = await fetch(API_URL + separator + '_=' + Date.now(), {
       redirect: 'follow',
       cache: 'no-store',
+      headers: { Accept: 'application/json' },
       signal: controller.signal
     });
     if(!res.ok) throw new Error('HTTP ' + res.status);
@@ -979,10 +981,14 @@ async function loadFromAPI(){
     try {
       payload = JSON.parse(text);
     } catch (err) {
-      throw new Error('API respondeu com conteúdo que não é JSON válido.');
+      throw new Error('API respondeu com conteúdo que não é JSON válido (HTTP ' + res.status + ').');
     }
 
-    console.log('[Torre API] payload bruto:', payload);
+    console.log('[Torre API] resposta JSON recebida:', {
+      status: res.status,
+      url: res.url,
+      bytes: text.length
+    });
 
     const normalized = payload && payload.data ? payload.data : payload;
   if(!normalized || !Array.isArray(normalized.cols) || !Array.isArray(normalized.rows)){

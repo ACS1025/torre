@@ -72,11 +72,11 @@ async function getApiPayload(){
   const timeoutId=setTimeout(()=>controller.abort(),600000);
   try{
     const separator=API_URL.includes('?')?'&':'?';
-    const res=await fetch(API_URL+separator+'_='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller.signal});
+    const res=await fetch(API_URL+separator+'_='+Date.now(),{redirect:'follow',cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const text=await res.text();
     if(!text.trim())throw new Error('Resposta vazia da API.');
-    try{return JSON.parse(text);}catch(error){throw new Error('API respondeu com conteúdo que não é JSON válido.');}
+    try{return JSON.parse(text);}catch(error){throw new Error('API respondeu com conteúdo que não é JSON válido (HTTP '+res.status+').');}
   }finally{clearTimeout(timeoutId);}
 }
 async function load(){
