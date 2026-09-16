@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise de Riscos · Consultas de Veículos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0E1318;
+    --panel:#141B22;
+    --panel-alt:#1A222B;
+    --line:#28323D;
+    --line-strong:#3A4653;
+    --text:#E7ECF1;
+    --text-muted:#8D99A8;
+    --text-dim:#5E6B78;
+    --accent:#5B8FB9;
+    --apto:#4FA98C;
+    --avaliacao:#8B93C9;
+    --vencida:#D9A441;
+    --aguardando:#8D99A8;
+    --critical:#C1473B;
+    --radius:3px;
+    --sidebar-w:240px;
+    --toolsbar-w:96px;
+  }
+  html[data-theme="light"]{
+    --bg:#F4F1EA; --panel:#FFFDF8; --panel-alt:#EAE5DB; --sidebar:#E5DED1;
+    --line:#D2C8B9; --line-strong:#B5A895; --text:#20262B; --text-muted:#59636A;
+    --text-dim:#7A746A; --accent:#2F6F8F; --apto:#247A65; --avaliacao:#686FA5;
+    --vencida:#A86D12; --aguardando:#7A746A; --critical:#A63D35;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{
+    font-family:'Libre Caslon Text', serif;
+    font-weight:400;
+    margin:0;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  a{color:var(--accent);}
+  .theme-toggle{min-width:112px; padding:7px 10px;}
+  ::selection{background:var(--accent); color:#fff;}
+
+  /* ---------- Layout shell ---------- */
+  .shell{
+    display:grid;
+    grid-template-columns:var(--sidebar-w) 1fr var(--toolsbar-w);
+    min-height:100vh;
+  }
+  header.topbar{
+    grid-column:2 / 3;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    padding:18px 32px;
+    border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+    gap:20px;
+  }
+  header.topbar .title-block h1{
+    font-size:30px;
+    letter-spacing:0.2px;
+    color:var(--text);
+  }
+  header.topbar .title-block p{
+    margin:6px 0 0;
+    color:var(--text-muted);
+    font-size:13px;
+  }
+  header.topbar .title-block p .updated{
+    font-family:'IBM Plex Mono', monospace;
+    color:var(--text-dim);
+  }
+  .actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  button, .btn{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:13px;
+    font-weight:500;
+    background:var(--panel-alt);
+    color:var(--text);
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    padding:9px 16px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  button:hover, .btn:hover{
+    border-color:var(--accent);
+    background:#212B36;
+  }
+  button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#0E1318;
+    font-weight:600;
+  }
+  button.primary:hover{
+    background:#6D9FC6;
+  }
+  /* ---------- KPI strip ---------- */
+  .kpi-strip{
+    grid-column:2 / 3;
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    border-bottom:1px solid var(--line);
+  }
+  .kpi{
+    padding:22px 20px;
+    border-right:1px solid var(--line);
+  }
+  .kpi:last-child{border-right:none;}
+  .kpi .label{
+    color:var(--text-muted);
+    font-size:12px;
+    margin-bottom:10px;
+  }
+  .kpi .value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:30px;
+    font-weight:500;
+    color:var(--text);
+  }
+  .kpi .sub{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--text-dim);
+  }
+  .kpi.warn .value{color:var(--vencida);}
+  .kpi.ok .value{color:var(--apto);}
+
+  /* ---------- Filters ---------- */
+  .filters{
+    grid-column:2 / 3;
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    padding:20px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:170px;
+  }
+  .field label{
+    font-size:11px;
+    color:var(--text-dim);
+  }
+  select, input[type="date"], input[type="text"]{
+    background:var(--panel-alt);
+    color:var(--text);
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    padding:8px 10px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:13px;
+  }
+  .field.grow{flex:1; min-width:220px;}
+  .filters .reset{
+    margin-left:auto;
+    align-self:flex-end;
+  }
+
+  /* ---------- Main grid ---------- */
+  .grid{
+    grid-column:2 / 3;
+    display:grid;
+    grid-template-columns:1.6fr 1fr;
+    gap:0;
+    border-bottom:1px solid var(--line);
+  }
+  .col-left{border-right:1px solid var(--line);}
+  .panel{
+    padding:26px 28px;
+    border-bottom:1px solid var(--line);
+  }
+  .col-left .panel:last-child{border-bottom:none;}
+  .col-right .panel:last-child{border-bottom:none;}
+  .panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:18px;
+    border-top:2px solid var(--accent);
+    padding-top:10px;
+  }
+  .panel-head h2{
+    font-size:17px;
+    color:var(--text);
+  }
+  .panel-head .note{
+    font-size:11px;
+    color:var(--text-dim);
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .chart-wrap{position:relative; height:240px;}
+  .chart-wrap.tall{height:320px;}
+
+  /* two small charts side by side */
+  .split{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:28px;
+  }
+
+  /* ---------- Ranking table ---------- */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+  thead th{
+    text-align:left;
+    color:var(--text-dim);
+    font-weight:500;
+    font-size:11px;
+    padding:0 8px 10px 0;
+    border-bottom:1px solid var(--line-strong);
+    cursor:pointer;
+    -webkit-user-select:none;
+    user-select:none;
+    white-space:nowrap;
+  }
+  thead th:hover{color:var(--text-muted);}
+  thead th.sorted{color:var(--accent);}
+  tbody td{
+    padding:9px 8px 9px 0;
+    border-bottom:1px solid var(--line);
+    vertical-align:middle;
+  }
+  tbody tr:hover{background:var(--panel-alt);}
+  td.num, th.num{text-align:right; font-family:'IBM Plex Mono', monospace;}
+  .client-name{
+    display:block;
+    max-width:220px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .risk-bar-track{
+    width:100%;
+    height:5px;
+    background:var(--line);
+    border-radius:2px;
+    overflow:hidden;
+  }
+  .risk-bar-fill{
+    height:100%;
+    background:var(--vencida);
+  }
+  .risk-bar-fill.high{background:var(--critical);}
+  .table-scroll{max-height:520px; overflow-y:auto;}
+
+  /* ---------- Alerts ---------- */
+  .alerts-panel{padding:26px 0 0;}
+  .alerts-panel, footer{grid-column:2 / 3; padding-left:32px; padding-right:32px;}
+  .alert-list{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+  }
+  .alert-item{
+    background:var(--panel);
+    padding:20px 22px;
+  }
+  .alert-item .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--critical);
+    letter-spacing:.3px;
+  }
+  .alert-item.info .tag{color:var(--accent);}
+  .alert-item p{
+    margin:8px 0 0;
+    font-size:13px;
+    color:var(--text-muted);
+    line-height:1.55;
+  }
+  .alert-item .big{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:22px;
+    margin-top:10px;
+    color:var(--text);
+  }
+
+  footer{
+    padding:24px 0 0;
+    color:var(--text-dim);
+    font-size:11.5px;
+  }
+
+  .nav-sidebar{
+    grid-row:1 / 7;
+    background:var(--sidebar, #10161C);
+    border-right:1px solid var(--line);
+    padding:24px 0;
+    display:flex;
+    flex-direction:column;
+  }
+  .brand{
+    padding:0 22px 22px;
+    margin-bottom:14px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand .mark{font-family:'Libre Caslon Text', serif; font-size:19px; color:var(--text);}
+  .brand .sub{margin-top:4px; font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono', monospace;}
+  .nav-group{padding:0 14px; margin-bottom:22px;}
+  .nav-group-label{font-size:11px; color:var(--text-dim); padding:0 8px 8px;}
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 8px;
+    border-radius:var(--radius);
+    border-left:2px solid transparent;
+    color:var(--text-muted);
+    font-size:13.5px;
+  }
+  .nav-item .dot{width:5px; height:5px; border-radius:50%; background:var(--text-dim); flex-shrink:0;}
+  .nav-item.active{background:var(--panel-alt); color:var(--text); border-left-color:var(--accent);}
+  .nav-item.active .dot{background:var(--accent);}
+  .nav-item.disabled{color:var(--text-dim);}
+  .tag-soon{margin-left:auto; font:9.5px 'IBM Plex Mono', monospace; border:1px solid var(--line-strong); border-radius:2px; padding:1px 5px;}
+  .nav-footer{margin-top:auto; padding:14px 22px 0; border-top:1px solid var(--line); font-size:11px; color:var(--text-dim);}
+  .tools-sidebar{
+    grid-column:3 / 4;
+    grid-row:1 / 7;
+    background:var(--sidebar, #10161C);
+    border-left:1px solid var(--line);
+    padding:24px 12px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  .tools-label{font-size:10px; color:var(--text-dim); margin-bottom:6px; text-align:center;}
+  .tool-btn{
+    width:72px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    padding:12px 6px;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:var(--panel);
+    color:var(--text-muted);
+    font-size:10.5px;
+    text-align:center;
+    line-height:1.3;
+  }
+  .tool-btn svg{width:18px; height:18px; stroke:var(--text-muted);}
+  .tool-btn:hover{border-color:var(--accent); color:var(--text);}
+  .tool-btn.disabled{opacity:.4;}
+
+  .client-filter{display:flex; gap:8px;}
+  .client-select{flex:1; min-width:0;}
+  .copy-link-btn{padding:8px 12px;}
+  .hidden{display:none !important;}
+  .panel-head.compact{
+    padding:0;
+    margin-bottom:18px;
+    border-top:none;
+  }
+
+  .empty-note{
+    color:var(--text-dim);
+    font-size:12.5px;
+    padding:12px 0;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:24px;
+    right:24px;
+    background:var(--panel-alt);
+    border:1px solid var(--accent);
+    color:var(--text);
+    padding:12px 18px;
+    border-radius:var(--radius);
+    font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    transform:translateY(12px);
+    opacity:0;
+    transition:transform .25s ease, opacity .25s ease;
+    pointer-events:none;
+    z-index:50;
+  }
+  .toast.show{transform:translateY(0); opacity:1;}
+
+  @media (max-width:1200px){
+    .alert-list{grid-template-columns:repeat(2,1fr);}
+  }
+  @media (max-width:980px){
+    .shell{grid-template-columns:1fr;}
+    .nav-sidebar{grid-row:2; border-right:none; border-bottom:1px solid var(--line); flex-direction:row; flex-wrap:wrap; padding:14px;}
+    .brand, .nav-footer{display:none;}
+    .nav-group{margin-bottom:0;}
+    header.topbar, .kpi-strip, .filters, .grid, .alerts-panel, footer{grid-column:1;}
+    header.topbar{align-items:flex-start;}
+    .tools-sidebar{grid-column:1; grid-row:3; flex-direction:row; border-left:none; border-top:1px solid var(--line); overflow-x:auto;}
+    .alerts-panel, footer{padding-left:20px; padding-right:20px;}
+    .grid{grid-template-columns:1fr;}
+    .col-left{border-right:none;}
+    .kpi-strip{grid-template-columns:repeat(2,1fr);}
+    .kpi:nth-child(2n){border-right:none;}
+    .split{grid-template-columns:1fr;}
+    .alert-list{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+<base target="_blank">
+</head>
+<body>
+<div class="shell">
+
+  <nav class="nav-sidebar">
+    <div class="brand">
+      <div class="mark">Torre Komando</div>
+      <div class="sub">Gestão de risco logístico</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Navegação</div>
+      <a class="nav-item" href="index.html">
+        <span class="dot"></span> Página inicial
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Consultas</div>
+      <a class="nav-item active" href="analise_veiculo.html">
+        <span class="dot"></span> Consulta Veículo
+      </a>
+      <a class="nav-item" href="analise_motorista.html">
+        <span class="dot"></span> Consulta Motorista
+      </a>
+      <div class="nav-item disabled">
+        <span class="dot"></span> Ranking de risco <span class="tag-soon">em breve</span>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Clientes</div>
+      <a class="nav-item" href="analise_cliente.html">
+        <span class="dot"></span> Análise por cliente
+      </a>
+      <div class="nav-item disabled">
+        <span class="dot"></span> Solicitantes <span class="tag-soon">em breve</span>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Dados</div>
+      <div class="nav-item disabled">
+        <span class="dot"></span> Exportações <span class="tag-soon">em breve</span>
+      </div>
+    </div>
+
+    <div class="nav-footer">
+      Estrutura em construção — consultas de veículo e motorista ativas.
+    </div>
+  </nav>
+
+  <header class="topbar">
+    <div class="title-block">
+      <h1>Análise de Riscos</h1>
+      <p>Consultas de aptidão veicular para liberação de carga · <span class="updated" id="updated-label">—</span></p>
+    </div>
+    <div class="actions">
+      <button id="refresh-btn" title="Buscar novamente os dados da API">&#8635; Atualizar</button>
+      <button id="export-btn">Exportar CSV filtrado</button>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Alternar tema">Tema claro</button>
+    </div>
+  </header>
+
+  <section class="kpi-strip" id="kpi-strip"></section>
+
+  <section class="filters">
+    <div class="field grow">
+      <label for="f-cliente">Cliente</label>
+      <div class="client-filter">
+        <select id="f-cliente" class="client-select"><option value="">Todos</option></select>
+        <button id="copy-client-link" class="copy-link-btn" title="Copiar link filtrado para este cliente">🔗</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-status">Status</label>
+      <select id="f-status"><option value="">Todos</option></select>
+    </div>
+    <div class="field">
+      <label for="f-perfil">Perfil do veículo</label>
+      <select id="f-perfil"><option value="">Todos</option></select>
+    </div>
+    <div class="field">
+      <label for="f-tipo">Tipo de veículo</label>
+      <select id="f-tipo"><option value="">Todos</option></select>
+    </div>
+    <div class="field">
+      <label for="f-ano">Ano</label>
+      <select id="f-ano"><option value="">Todos</option></select>
+    </div>
+    <div class="field">
+      <label for="f-de">De</label>
+      <input type="date" id="f-de">
+    </div>
+    <div class="field">
+      <label for="f-ate">Até</label>
+      <input type="date" id="f-ate">
+    </div>
+    <button class="reset" id="reset-filters">Limpar filtros</button>
+  </section>
+
+  <section class="grid">
+    <div class="col-left">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Volume diário de consultas</h2>
+          <span class="note" id="volume-note"></span>
+        </div>
+        <div class="chart-wrap tall"><canvas id="chart-volume"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Status das consultas</h2>
+          <span class="note" id="status-note"></span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="split">
+          <div>
+            <div class="panel-head">
+              <h2>Perfil do veículo</h2>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-perfil"></canvas></div>
+          </div>
+          <div>
+            <div class="panel-head">
+              <h2>Tipo de veículo (top 10)</h2>
+            </div>
+            <div class="chart-wrap"><canvas id="chart-tipo"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Ranking de risco por cliente</h2>
+          <span class="note">% vencida</span>
+        </div>
+        <div class="table-scroll">
+          <table id="ranking-table">
+            <thead>
+              <tr>
+                <th data-key="cliente">Cliente</th>
+                <th class="num" data-key="total">Consultas</th>
+                <th class="num" data-key="vencidas">Vencidas</th>
+                <th class="num sorted" data-key="risco">Risco</th>
+              </tr>
+            </thead>
+            <tbody id="ranking-body"></tbody>
+          </table>
+        </div>
+        <p class="empty-note hidden" id="ranking-empty">Nenhum cliente com volume suficiente para ranquear com os filtros atuais.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="alerts-panel">
+    <div class="panel-head compact">
+      <h2>Sinais de atenção</h2>
+      <span class="note">calculado sobre o conjunto filtrado</span>
+    </div>
+    <div class="alert-list" id="alert-list"></div>
+  </section>
+
+  <footer>
+    <p id="footer-count"></p>
+    <p>Fonte: API de consultas de análise de perfil de veículo. Os dados são carregados em tempo real no navegador sem armazenamento local do arquivo original.</p>
+  </footer>
+
+  <aside class="tools-sidebar">
+    <div class="tools-label">Ferramentas</div>
+    <a class="tool-btn" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M9.5 19.5v-6h5v6"/></svg>
+      Central
+    </a>
+    <button class="tool-btn" id="export-tool-btn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+      Exportar
+    </button>
+    <div class="tool-btn disabled">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      Histórico
+    </div>
+  </aside>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== Estado ===================== */
+let DATASET = [];      // array de objetos normalizados
+let CHARTS = {};        // instâncias Chart.js
+let SORT_KEY = 'risco';
+let SORT_DIR = -1;
+let DEDUP_REMOVED = 0;  // reavaliações duplicadas removidas na última carga
+let RAW_SNAPSHOT = null; // último payload completo da API, com TODAS as colunas (fase 1: nada descartado)
+
+/* ===================== Configuração da API ===================== */
+// URL do Web App do Google Apps Script (implantado como "Qualquer pessoa").
+// A fonte principal de dados é a API; o fallback offline só deve ser usado se a API falhar.
+const API_URL = 'https://script.google.com/macros/s/AKfycbzDkYy6bKno8EHs05CWztRtWsQOS8qCnHDw9uF6KCQNv-tBcpTzOA-Arlh7TAug2WU/exec';
+const FORCE_LOCAL_TEST_DATA = new URLSearchParams(window.location.search).get('localData') === '1';
+
+const STATUS_COLORS = {
+  'Apto': getVar('--apto'),
+  'Avaliação concluída': getVar('--avaliacao'),
+  'Consulta vencida': getVar('--vencida'),
+  'Aguardando': getVar('--aguardando')
+};
+
+function getVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ===================== Parsing de datas BR ===================== */
+function parseBRDateTime(val){
+  if(val === null || val === undefined) return null;
+  // célula Excel guardada como número de série de data
+  if(typeof val === 'number'){
+    if(window.XLSX && XLSX.SSF && XLSX.SSF.parse_date_code){
+      const d = XLSX.SSF.parse_date_code(val);
+      if(d) return new Date(d.y, (d.m||1)-1, d.d||1, d.H||0, d.M||0, Math.floor(d.S||0));
+    }
+    return null;
+  }
+  let str = String(val).trim();
+  if(!str || str === '-' || str.toLowerCase() === 'nan') return null;
+  // dd/mm/yyyy hh:mm:ss  OU  dd/mm/yyyy hh:mm  OU  dd/mm/yyyy
+  let m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(m){
+    const [, d, mo, y, h, mi, s] = m;
+    return new Date(Number(y), Number(mo)-1, Number(d), Number(h||0), Number(mi||0), Number(s||0));
+  }
+  // fallback: qualquer formato reconhecível nativamente (ex.: planilha exportada em outro locale)
+  const fallback = new Date(str);
+  if(!isNaN(fallback.getTime())) return fallback;
+  return null;
+}
+
+function toDateInputValue(d){
+  if(!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+/* ===================== Mapeamento de planilhas enviadas pelo usuário ===================== */
+// Localiza as colunas pelo nome do cabeçalho (não pela posição), pois exportações
+// mensais podem ter colunas extras/vazias em posições diferentes do arquivo original.
+const FIELD_HEADERS = {
+  codigo:   ['código','codigo','código rastreamento','codigo rastreamento'],
+  protocolo:['protocolo','número protocolo','numero protocolo'],
+  status:   ['status','status consulta','status da consulta','situação','situacao'],
+  cliente:  ['razão social cliente','razao social cliente','cliente','razão social','razao social','nome cliente'],
+  cnpj:     ['cnpj','cnpj cliente','cnpj do cliente'],
+  placa:    ['placa veículo','placa veiculo','placa do veículo','placa do veiculo','placa'],
+  tipo:     ['tipo veículo','tipo veiculo','tipo de veículo','tipo de veiculo','tipo'],
+  perfil:   ['perfil veículo','perfil veiculo','perfil de veículo','perfil de veiculo','perfil'],
+  consulta: ['data consulta','data da consulta','data de consulta','data consulta veículo','data consulta veiculo'],
+  validade: ['data validade','data de validade','validade','data validade consulta'],
+  resposta: ['data resposta','data da resposta','data de resposta','data resposta consulta']
+};
+
+function normalizeHeaderName(value){
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' e ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim();
+}
+
+function findHeaderIndex(headerRow, aliases){
+  if(!Array.isArray(headerRow)) return -1;
+
+  const normalizedAliases = aliases
+    .map(normalizeHeaderName)
+    .filter(Boolean);
+
+  // 1) Correspondência exata normalizada.
+  for(let i=0;i<headerRow.length;i++){
+    const h = normalizeHeaderName(headerRow[i]);
+    if(h && normalizedAliases.includes(h)) return i;
+  }
+
+  // 2) Correspondência por conteúdo somente quando for inequívoca.
+  // Isso aceita pequenas variações como "Data de Consulta (real)" sem
+  // depender da posição da coluna e sem confundir cabeçalhos parecidos.
+  const candidates = [];
+  for(let i=0;i<headerRow.length;i++){
+    const h = normalizeHeaderName(headerRow[i]);
+    if(!h) continue;
+
+    const matched = normalizedAliases.some(alias =>
+      h.startsWith(alias + ' ') ||
+      h.endsWith(' ' + alias) ||
+      h.includes(' ' + alias + ' ')
+    );
+
+    if(matched) candidates.push(i);
+  }
+
+  return candidates.length === 1 ? candidates[0] : -1;
+}
+
+function extractFromRawSheet(rows){
+  if(!rows || rows.length < 2) return [];
+
+  const header = rows[0];
+  const idx = {};
+
+  for(const key in FIELD_HEADERS){
+    idx[key] = findHeaderIndex(header, FIELD_HEADERS[key]);
+  }
+
+  const essential = ['status','cliente','consulta'];
+  const missing = essential.filter(k => idx[k] === -1);
+
+  // Não altera o payload bruto da API. Apenas informa quais campos o painel
+  // não conseguiu projetar para suas 11 colunas internas.
+  window.__TORRE_HEADER_MAP__ = {
+    headersRecebidos: Array.isArray(header) ? header.slice() : [],
+    indices: {...idx},
+    faltantes: missing.slice()
+  };
+
+  if(missing.length){
+    throw new Error(
+      'Não encontrei no cabeçalho as colunas essenciais: ' +
+      missing.map(k=>FIELD_HEADERS[k][0]).join(', ') +
+      '. Cabeçalhos recebidos: ' +
+      header.filter(v => String(v ?? '').trim() !== '').join(' | ')
+    );
+  }
+
+  const out = [];
+
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r];
+    if(!row || row.length === 0) continue;
+
+    out.push([
+      idx.codigo    > -1 ? row[idx.codigo]    : '',
+      idx.protocolo > -1 ? row[idx.protocolo] : '',
+      idx.status    > -1 ? row[idx.status]    : '',
+      idx.cliente   > -1 ? row[idx.cliente]   : '',
+      idx.cnpj      > -1 ? row[idx.cnpj]      : '',
+      idx.placa     > -1 ? row[idx.placa]     : '',
+      idx.tipo      > -1 ? row[idx.tipo]      : '',
+      idx.perfil    > -1 ? row[idx.perfil]    : '',
+      idx.consulta  > -1 ? row[idx.consulta]  : '',
+      idx.validade  > -1 ? row[idx.validade]  : '',
+      idx.resposta  > -1 ? row[idx.resposta]  : ''
+    ]);
+  }
+
+  return out;
+}
+
+/* ===================== Deduplicação por Protocolo ===================== */
+// Quando uma consulta é reavaliada (Aguardando → Avaliação concluída → Consulta vencida),
+// mantém só o registro mais recente daquele protocolo. Registros "Apto" nunca são
+// deduplicados entre si — cada um conta como consulta independente.
+const STATUS_REAVALIACAO = ['Aguardando', 'Avaliação concluída', 'Consulta vencida'];
+
+function dedupPorProtocolo(tuples){
+  const map = {};
+  tuples.forEach((r, i) => {
+    const protocolo = r[1];
+    const status = String(r[2] || '').trim();
+    const resposta = r[9];
+    if(STATUS_REAVALIACAO.includes(status) && protocolo){
+      const key = 'P_' + protocolo;
+      const atual = map[key];
+      if(!atual){
+        map[key] = r;
+      } else {
+        const dNovo = parseBRDateTime(resposta);
+        const dAtual = parseBRDateTime(atual[9]);
+        if(dNovo && (!dAtual || dNovo > dAtual)) map[key] = r;
+      }
+    } else {
+      map['U_' + i] = r;
+    }
+  });
+  return Object.values(map);
+}
+
+/* ===================== Normalização de linhas cruas ===================== */
+// tupla já mapeada: [codigo, protocolo, status, cliente, cnpj, placa, tipo, perfil, consulta, validade, resposta]
+function normalizeRows(rawRows){
+  const out = [];
+  for(const r of rawRows){
+    if(!r || r.length < 11) continue;
+    const [codigo, protocolo, status, cliente, cnpj, placa, tipo, perfil, consulta, validade, resposta] = r;
+    if(!status || String(status).trim()==='') continue;
+    const consultaDate = parseBRDateTime(consulta);
+    const validadeDate = parseBRDateTime(validade);
+    const respostaDate = parseBRDateTime(resposta);
+    out.push({
+      codigo: codigo,
+      protocolo: String(protocolo||'').trim(),
+      status: String(status).trim(),
+      cliente: String(cliente||'').trim(),
+      cnpj: String(cnpj||'').trim(),
+      placa: String(placa||'').trim(),
+      tipo: String(tipo||'').trim(),
+      perfil: String(perfil||'').trim(),
+      consultaDate, validadeDate, respostaDate
+    });
+  }
+  return out;
+}
+
+/* ===================== Carga inicial ===================== */
+// O snapshot embutido é apenas para testes locais. Por padrão ele deve ser ignorado,
+// para que a página carregue automaticamente a API real em vez do arquivo de teste.
+function loadEmbeddedData(){
+  if(!FORCE_LOCAL_TEST_DATA){
+    return {
+      tuples: [],
+      label: 'API ativa: ignorando snapshot local',
+      fetchedAt: null,
+      sources: []
+    };
+  }
+
+  const tag = document.getElementById('embedded-data');
+  if(!tag || !tag.textContent.trim()){
+    return {
+      tuples: [],
+      label: 'Sem dados locais embutidos',
+      fetchedAt: null,
+      sources: []
+    };
+  }
+
+  try{
+    const parsed = JSON.parse(tag.textContent);
+    if(Array.isArray(parsed) && parsed.length && Array.isArray(parsed[0])){
+      return {
+        tuples: parsed,
+        label: 'Dados locais embutidos · ' + parsed.length.toLocaleString('pt-BR') + ' linhas',
+        fetchedAt: new Date().toISOString(),
+        sources: ['arquivo local']
+      };
+    }
+
+    if(parsed && Array.isArray(parsed.cols) && Array.isArray(parsed.rows)){
+      const tuples = extractFromRawSheet([parsed.cols, ...parsed.rows]);
+      return {
+        tuples,
+        label: 'Dados locais embutidos · ' + parsed.rows.length.toLocaleString('pt-BR') + ' linhas brutas',
+        fetchedAt: parsed.fetchedAt || new Date().toISOString(),
+        sources: parsed.sources || ['arquivo local']
+      };
+    }
+
+    return {
+      tuples: [],
+      label: 'Formato local inesperado',
+      fetchedAt: null,
+      sources: []
+    };
+  }catch(err){
+    console.error('Falha ao ler dados locais embutidos:', err);
+    return {
+      tuples: [],
+      label: 'API indisponível · fallback local falhou',
+      fetchedAt: null,
+      sources: []
+    };
+  }
+}
+
+/* ===================== Carga via API ===================== */
+// A API retorna { cols, rows, sources, fetchedAt } com os registros agregados.
+// A projeção para as 11 colunas usadas pelo painel acontece em extractFromRawSheet(),
+// pelo nome do cabeçalho.
+async function loadFromAPI(){
+  if(typeof google !== 'undefined' && google.script && google.script.run){
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler((payload) => {
+          try {
+            const normalized = payload && payload.data ? payload.data : payload;
+            if(!normalized || !Array.isArray(normalized.cols) || !Array.isArray(normalized.rows)){
+              throw new Error('Resposta da API sem cols/rows');
+            }
+
+            RAW_SNAPSHOT = normalized;
+            const tuples = extractFromRawSheet([normalized.cols, ...normalized.rows]);
+            const totalFonte = normalized.rows.length;
+            const label = (normalized.sources || []).length + ' origem(s) · ' +
+              totalFonte.toLocaleString('pt-BR') + ' linhas brutas · ' +
+              'sincronizado ' + new Date(normalized.fetchedAt || Date.now()).toLocaleString('pt-BR');
+
+            window.__TORRE_API_DEBUG__ = {
+              source: 'google.script.run',
+              payload: normalized,
+              tuplesCount: tuples.length,
+              firstTuple: tuples[0]
+            };
+
+            resolve({ tuples, label, fetchedAt: normalized.fetchedAt, sources: normalized.sources || [] });
+          }catch(err){
+            reject(err);
+          }
+        })
+        .withFailureHandler((err) => {
+          reject(err);
+        })
+        .getDashboardData();
+    });
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 180000);
+
+  try {
+    const res = await fetch(API_URL, {
+      redirect: 'follow',
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    if(!text || !text.trim()) throw new Error('Resposta vazia da API.');
+
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch (err) {
+      throw new Error('API respondeu com conteúdo que não é JSON válido.');
+    }
+
+    console.log('[Torre API] payload bruto:', payload);
+
+    const normalized = payload && payload.data ? payload.data : payload;
+  if(!normalized || !Array.isArray(normalized.cols) || !Array.isArray(normalized.rows)){
+    throw new Error('Resposta da API sem cols/rows');
+  }
+
+    RAW_SNAPSHOT = normalized;
+    const tuples = extractFromRawSheet([normalized.cols, ...normalized.rows]);
+    const totalFonte = normalized.rows.length;
+    const label = (normalized.sources || []).length + ' origem(s) · ' +
+      totalFonte.toLocaleString('pt-BR') + ' linhas brutas · ' +
+      'sincronizado ' + new Date(normalized.fetchedAt || Date.now()).toLocaleString('pt-BR');
+    window.__TORRE_API_DEBUG__ = {
+      source: 'fetch',
+      payload: normalized,
+      tuplesCount: tuples.length,
+      firstTuple: tuples[0]
+    };
+    return { tuples, label, fetchedAt: normalized.fetchedAt, sources: normalized.sources || [] };
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new Error('Tempo limite ao consultar a API.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function applyDataset(source){
+  const tuplesOriginais = Array.isArray(source.tuples) ? source.tuples : [];
+  const deduped = dedupPorProtocolo(tuplesOriginais);
+
+  DEDUP_REMOVED = tuplesOriginais.length - deduped.length;
+  DATASET = normalizeRows(deduped);
+
+  window.__TORRE_DATA_DIAGNOSTICS__ = {
+    linhasBrutasAPI: RAW_SNAPSHOT && Array.isArray(RAW_SNAPSHOT.rows)
+      ? RAW_SNAPSHOT.rows.length
+      : 0,
+    tuplasProjetadas: tuplesOriginais.length,
+    aposDeduplicacao: deduped.length,
+    registrosNormalizados: DATASET.length,
+    removidosPorDedup: DEDUP_REMOVED,
+    fontes: source.sources || [],
+    campos: window.__TORRE_HEADER_MAP__ || null
+  };
+
+  let txt = source.label +
+    ' · ' +
+    DATASET.length.toLocaleString('pt-BR') +
+    ' registros (após dedup por protocolo)';
+
+  if(DEDUP_REMOVED > 0){
+    txt += ' · ' +
+      DEDUP_REMOVED.toLocaleString('pt-BR') +
+      ' reavaliações duplicadas removidas';
+  }
+
+  document.getElementById('updated-label').textContent = txt;
+}
+
+/* ===================== Upload de nova planilha ===================== */
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=> t.classList.remove('show'), 4200);
+}
+
+/* ===================== Filtros ===================== */
+function uniqueSorted(arr){
+  return Array.from(new Set(arr.filter(v=>v && v.length))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+}
+
+function buildFilterOptions(){
+  const clientes = uniqueSorted(DATASET.map(d=>d.cliente));
+  const statuses = uniqueSorted(DATASET.map(d=>d.status));
+  const perfis = uniqueSorted(DATASET.map(d=>d.perfil));
+  const tipos = uniqueSorted(DATASET.map(d=>d.tipo));
+  const anos = uniqueSorted(
+    DATASET
+      .filter(d => d.consultaDate)
+      .map(d => String(d.consultaDate.getFullYear()))
+  ).sort((a, b) => Number(b) - Number(a));
+
+  fillSelect('f-cliente', clientes);
+  fillSelect('f-status', statuses);
+  fillSelect('f-perfil', perfis);
+  fillSelect('f-tipo', tipos);
+  fillSelect('f-ano', anos);
+}
+
+function fillSelect(id, values){
+  const sel = document.getElementById(id);
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + values.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  if(values.includes(current)) sel.value = current;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function getFilteredData(){
+  const cliente = document.getElementById('f-cliente').value;
+  const status = document.getElementById('f-status').value;
+  const perfil = document.getElementById('f-perfil').value;
+  const tipo = document.getElementById('f-tipo').value;
+  const ano = document.getElementById('f-ano').value;
+  const de = document.getElementById('f-de').value ? new Date(document.getElementById('f-de').value + 'T00:00:00') : null;
+  const ate = document.getElementById('f-ate').value ? new Date(document.getElementById('f-ate').value + 'T23:59:59') : null;
+
+  return DATASET.filter(d => {
+    if(cliente && d.cliente !== cliente) return false;
+    if(status && d.status !== status) return false;
+    if(perfil && d.perfil !== perfil) return false;
+    if(tipo && d.tipo !== tipo) return false;
+    if(ano && (!d.consultaDate || String(d.consultaDate.getFullYear()) !== String(ano))) return false;
+    if(de && (!d.consultaDate || d.consultaDate < de)) return false;
+    if(ate && (!d.consultaDate || d.consultaDate > ate)) return false;
+    return true;
+  });
+}
+
+['f-cliente','f-status','f-perfil','f-tipo','f-ano','f-de','f-ate'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+document.getElementById('f-cliente').addEventListener('change', (e) => {
+  setClienteInURL(e.target.value);
+});
+document.getElementById('reset-filters').addEventListener('click', () => {
+  ['f-cliente','f-status','f-perfil','f-tipo','f-ano','f-de','f-ate'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  setClienteInURL('');
+  applyFilters();
+});
+
+/* ===================== Agregações ===================== */
+function computeKPIs(data, totalGeral = data.length){
+  const total = data.length;
+  const byStatus = countBy(data, d=>d.status);
+  const apto = byStatus['Apto']||0;
+  const vencida = byStatus['Consulta vencida']||0;
+  const aguardando = byStatus['Aguardando']||0;
+
+  const tempos = data
+    .filter(d=>d.consultaDate && d.respostaDate)
+    .map(d=>(d.respostaDate - d.consultaDate)/60000)
+    .filter(v=>v >= 0 && v < 60*24*5); // descarta negativos (anomalia) e outliers extremos (>5 dias)
+
+  const tempoMedio = tempos.length ? tempos.reduce((a,b)=>a+b,0)/tempos.length : null;
+
+  return {
+    totalGeral,
+    total,
+    aptoPct: total ? (apto/total*100) : 0,
+    vencidaPct: total ? (vencida/total*100) : 0,
+    aguardando,
+    tempoMedio
+  };
+}
+
+function countBy(data, keyFn){
+  const out = {};
+  for(const d of data){
+    const k = keyFn(d);
+    out[k] = (out[k]||0) + 1;
+  }
+  return out;
+}
+
+function formatMinutes(mins){
+  if(mins === null || isNaN(mins)) return '—';
+  if(mins < 60) return Math.round(mins) + ' min';
+  const h = Math.floor(mins/60);
+  const m = Math.round(mins%60);
+  return h + 'h ' + m + 'min';
+}
+
+function computeVolumePorDia(data, janelaDias = 90){
+  const byDay = {};
+  for(const d of data){
+    if(!d.consultaDate) continue;
+    const key = toDateInputValue(d.consultaDate);
+    byDay[key] = (byDay[key]||0) + 1;
+  }
+  const allKeys = Object.keys(byDay).sort();
+  const lastKey = allKeys[allKeys.length - 1];
+  if(!lastKey) return { labels: [], values: [], janelaDias };
+
+  const lastDate = parseBRDateTime(lastKey.split('-').reverse().join('/'));
+  const firstDate = new Date(lastDate);
+  firstDate.setDate(firstDate.getDate() - (janelaDias - 1));
+  const firstKey = toDateInputValue(firstDate);
+  const keys = allKeys.filter(key => key >= firstKey);
+  return { labels: keys, values: keys.map(k=>byDay[k]), janelaDias };
+}
+
+function computeStatusDist(data){
+  const order = ['Apto','Avaliação concluída','Consulta vencida','Aguardando'];
+  const byStatus = countBy(data, d=>d.status);
+  const labels = order.filter(o => byStatus[o] !== undefined);
+  Object.keys(byStatus).forEach(k=>{ if(!labels.includes(k)) labels.push(k); });
+  return { labels, values: labels.map(l=>byStatus[l]||0) };
+}
+
+function computePerfilDist(data){
+  const byPerfil = countBy(data, d=>d.perfil || 'Não informado');
+  const labels = Object.keys(byPerfil).sort((a,b)=>byPerfil[b]-byPerfil[a]);
+  return { labels, values: labels.map(l=>byPerfil[l]) };
+}
+
+function computeTipoTop(data, n=10){
+  const byTipo = countBy(data, d=>d.tipo || 'Não informado');
+  const labels = Object.keys(byTipo).sort((a,b)=>byTipo[b]-byTipo[a]).slice(0,n);
+  return { labels, values: labels.map(l=>byTipo[l]) };
+}
+
+function computeRanking(data, minTotal=3){
+  const groups = {};
+  for(const d of data){
+    if(!d.cliente) continue;
+    if(!groups[d.cliente]) groups[d.cliente] = { total:0, vencidas:0 };
+    groups[d.cliente].total++;
+    if(d.status === 'Consulta vencida') groups[d.cliente].vencidas++;
+  }
+  let rows = Object.entries(groups)
+    .map(([cliente, g]) => ({
+      cliente,
+      total: g.total,
+      vencidas: g.vencidas,
+      risco: g.total ? (g.vencidas/g.total*100) : 0
+    }))
+    .filter(r => r.total >= minTotal);
+  return rows;
+}
+
+function computeAlerts(data){
+  const anomalias = data.filter(d => d.consultaDate && d.respostaDate && (d.respostaDate - d.consultaDate) < 0).length;
+  const vencidas = data.filter(d => d.status === 'Consulta vencida').length;
+  const placaCounts = countBy(data, d=>d.placa);
+  const placasRecorrentes = Object.values(placaCounts).filter(v=>v>=3).length;
+  const ranking = computeRanking(data, 3).sort((a,b)=>b.risco-a.risco);
+  const topRisco = ranking.length ? ranking[0] : null;
+
+  return { anomalias, vencidas, placasRecorrentes, topRisco, total: data.length };
+}
+
+/* ===================== Render: KPIs ===================== */
+function renderKPIs(k){
+  const el = document.getElementById('kpi-strip');
+  el.innerHTML = `
+    <div class="kpi">
+      <div class="label">Total geral</div>
+      <div class="value">${k.totalGeral.toLocaleString('pt-BR')}</div>
+      <div class="sub">todo o histórico carregado</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Consultas atuais</div>
+      <div class="value">${k.total.toLocaleString('pt-BR')}</div>
+      <div class="sub">ano e filtros selecionados</div>
+    </div>
+    <div class="kpi ok">
+      <div class="label">Aptas</div>
+      <div class="value">${k.aptoPct.toFixed(1)}%</div>
+      <div class="sub">do total filtrado</div>
+    </div>
+    <div class="kpi warn">
+      <div class="label">Vencidas</div>
+      <div class="value">${k.vencidaPct.toFixed(1)}%</div>
+      <div class="sub">sem renovação registrada</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Tempo médio de resposta</div>
+      <div class="value">${formatMinutes(k.tempoMedio)}</div>
+      <div class="sub">consulta → resposta</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Aguardando análise</div>
+      <div class="value">${k.aguardando.toLocaleString('pt-BR')}</div>
+      <div class="sub">consultas em aberto</div>
+    </div>
+  `;
+}
+
+/* ===================== Render: gráficos ===================== */
+function destroyChart(key){
+  if(CHARTS[key]){ CHARTS[key].destroy(); delete CHARTS[key]; }
+}
+
+const CHART_FONT = { family:"'IBM Plex Mono', monospace", size:11 };
+const GRID_COLOR = 'rgba(255,255,255,0.06)';
+const MUTED = getVar('--text-muted');
+
+function renderVolumeChart(agg){
+  destroyChart('volume');
+  const ctx = document.getElementById('chart-volume');
+  CHARTS.volume = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: agg.labels.map(l=>formatDateLabel(l)),
+      datasets:[{
+        data: agg.values,
+        borderColor: getVar('--accent'),
+        backgroundColor: 'rgba(91,143,185,0.12)',
+        borderWidth:2,
+        pointRadius:0,
+        tension:0.25,
+        fill:true
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ mode:'index', intersect:false } },
+      scales:{
+        x:{ ticks:{ color:MUTED, font:CHART_FONT, maxRotation:0 }, grid:{ color:GRID_COLOR } },
+        y:{ ticks:{ color:MUTED, font:CHART_FONT, precision:0 }, grid:{ color:GRID_COLOR }, beginAtZero:true }
+      }
+    }
+  });
+  document.getElementById('volume-note').textContent = 'últimos ' + agg.janelaDias + ' dias do recorte';
+}
+
+function formatDateLabel(iso){
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}`;
+}
+
+function renderStatusChart(agg){
+  destroyChart('status');
+  const ctx = document.getElementById('chart-status');
+  const colors = agg.labels.map(l => STATUS_COLORS[l] || getVar('--accent'));
+  CHARTS.status = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: agg.labels,
+      datasets:[{ data: agg.values, backgroundColor: colors, borderRadius:2, maxBarThickness:42 }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{ color:MUTED, font:CHART_FONT }, grid:{ color:GRID_COLOR }, beginAtZero:true },
+        y:{ ticks:{ color:getVar('--text'), font:{family:"'IBM Plex Sans', sans-serif", size:12} }, grid:{ display:false } }
+      }
+    }
+  });
+  document.getElementById('status-note').textContent = agg.values.reduce((a,b)=>a+b,0) + ' registros';
+}
+
+function renderPerfilChart(agg){
+  destroyChart('perfil');
+  const ctx = document.getElementById('chart-perfil');
+  const palette = [getVar('--accent'), getVar('--vencida'), getVar('--avaliacao'), getVar('--apto'), getVar('--critical')];
+  CHARTS.perfil = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels: agg.labels,
+      datasets:[{ data: agg.values, backgroundColor: agg.labels.map((_,i)=>palette[i%palette.length]), borderColor: getVar('--panel'), borderWidth:2 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      cutout:'62%',
+      plugins:{ legend:{ position:'bottom', labels:{ color:MUTED, font:{family:"'IBM Plex Sans', sans-serif", size:11}, boxWidth:10, padding:12 } } }
+    }
+  });
+}
+
+function renderTipoChart(agg){
+  destroyChart('tipo');
+  const ctx = document.getElementById('chart-tipo');
+  CHARTS.tipo = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: agg.labels,
+      datasets:[{ data: agg.values, backgroundColor: getVar('--accent'), borderRadius:2, maxBarThickness:16 }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{ color:MUTED, font:CHART_FONT }, grid:{ color:GRID_COLOR }, beginAtZero:true },
+        y:{ ticks:{ color:getVar('--text'), font:{family:"'IBM Plex Sans', sans-serif", size:10.5} }, grid:{ display:false } }
+      }
+    }
+  });
+}
+
+/* ===================== Render: ranking ===================== */
+function renderRanking(rows){
+  rows.sort((a,b)=> (a[SORT_KEY] > b[SORT_KEY] ? 1 : -1) * SORT_DIR);
+  const body = document.getElementById('ranking-body');
+  const empty = document.getElementById('ranking-empty');
+  if(rows.length === 0){
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  const maxRisco = Math.max(...rows.map(r=>r.risco), 1);
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td><span class="client-name" title="${escapeHtml(r.cliente)}">${escapeHtml(r.cliente)}</span></td>
+      <td class="num">${r.total}</td>
+      <td class="num">${r.vencidas}</td>
+      <td class="num">
+        <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+          <span>${r.risco.toFixed(0)}%</span>
+          <span class="risk-bar-track" style="width:50px;">
+            <span class="risk-bar-fill ${r.risco>=50?'high':''}" style="width:${(r.risco/maxRisco*100).toFixed(0)}%; display:block;"></span>
+          </span>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.querySelectorAll('#ranking-table thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if(SORT_KEY === key){ SORT_DIR *= -1; } else { SORT_KEY = key; SORT_DIR = (key === 'cliente') ? 1 : -1; }
+    document.querySelectorAll('#ranking-table thead th').forEach(x=>x.classList.remove('sorted'));
+    th.classList.add('sorted');
+    applyFilters(false);
+  });
+});
+
+/* ===================== Render: alertas ===================== */
+function renderAlerts(a){
+  const el = document.getElementById('alert-list');
+  const topRiscoTxt = a.topRisco
+    ? `${escapeHtml(a.topRisco.cliente)} — ${a.topRisco.risco.toFixed(0)}% das consultas vencidas (${a.topRisco.vencidas}/${a.topRisco.total})`
+    : 'sem clientes com volume suficiente';
+
+  el.innerHTML = `
+    <div class="alert-item">
+      <div class="tag">RISCO CONCENTRADO</div>
+      <p>${topRiscoTxt}</p>
+    </div>
+    <div class="alert-item">
+      <div class="tag">CONSULTAS VENCIDAS</div>
+      <div class="big">${a.vencidas.toLocaleString('pt-BR')}</div>
+      <p>de ${a.total.toLocaleString('pt-BR')} consultas no período filtrado, sem aptidão válida registrada.</p>
+    </div>
+    <div class="alert-item info">
+      <div class="tag">QUALIDADE DO DADO</div>
+      <div class="big">${a.anomalias.toLocaleString('pt-BR')}</div>
+      <p>respostas com carimbo de data/hora anterior à consulta — revisar exportação do sistema de origem.</p>
+    </div>
+    <div class="alert-item info">
+      <div class="tag">DEDUPLICAÇÃO</div>
+      <div class="big">${DEDUP_REMOVED.toLocaleString('pt-BR')}</div>
+      <p>reavaliações duplicadas do mesmo protocolo removidas (mantido o status mais recente). Registros "Apto" nunca são deduplicados.</p>
+    </div>
+  `;
+}
+
+/* ===================== Exportar CSV filtrado ===================== */
+document.getElementById('export-btn').addEventListener('click', () => {
+  const data = getFilteredData();
+  if(data.length === 0){ showToast('Nada para exportar com os filtros atuais.'); return; }
+  const header = ['codigo','protocolo','status','cliente','cnpj','placa','tipo','perfil','data_consulta','data_validade','data_resposta'];
+  const lines = [header.join(';')];
+  for(const d of data){
+    lines.push([
+      d.codigo, d.protocolo, d.status, csvSafe(d.cliente), d.cnpj, d.placa, csvSafe(d.tipo), d.perfil,
+      d.consultaDate ? d.consultaDate.toLocaleString('pt-BR') : '',
+      d.validadeDate ? d.validadeDate.toLocaleDateString('pt-BR') : '',
+      d.respostaDate ? d.respostaDate.toLocaleString('pt-BR') : ''
+    ].join(';'));
+  }
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'consultas_filtradas.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('export-tool-btn').addEventListener('click', () => {
+  document.getElementById('export-btn').click();
+});
+
+function csvSafe(s){
+  if(s && (s.includes(';') || s.includes('"'))) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+/* ===================== Sincronização com a URL (?cliente=) ===================== */
+// Convenção pra toda a estrutura: qualquer página interna linkada a partir daqui
+// deve ler o parâmetro "cliente" da URL e usá-lo pra pré-filtrar/travar sua própria tela.
+// Isso NÃO é controle de acesso — é conveniência de navegação. Qualquer pessoa pode
+// editar a URL. Quando existir login de verdade, o backend passa a decidir o cliente,
+// não a URL — mas o formato do link (?cliente=...) pode continuar o mesmo.
+function getClienteFromURL(){
+  const params = new URLSearchParams(window.location.search);
+  return params.get('cliente') || '';
+}
+
+function setClienteInURL(cliente){
+  const url = new URL(window.location.href);
+  if(cliente) url.searchParams.set('cliente', cliente);
+  else url.searchParams.delete('cliente');
+  window.history.replaceState({}, '', url);
+}
+
+// Monta a URL de uma página interna já filtrada para o cliente selecionado.
+// Ex.: buildInternalLink('ficha-cliente.html') -> 'ficha-cliente.html?cliente=SAMID...'
+function buildInternalLink(paginaRelativa){
+  const cliente = document.getElementById('f-cliente').value;
+  const url = new URL(paginaRelativa, window.location.href);
+  if(cliente) url.searchParams.set('cliente', cliente);
+  return url.toString();
+}
+
+document.getElementById('copy-client-link').addEventListener('click', async () => {
+  const cliente = document.getElementById('f-cliente').value;
+  if(!cliente){
+    showToast('Selecione um cliente para gerar o link filtrado.');
+    return;
+  }
+  const link = buildInternalLink(window.location.pathname.split('/').pop() || 'index.html');
+  try{
+    await navigator.clipboard.writeText(link);
+    showToast('Link copiado — ' + cliente);
+  }catch(e){
+    window.prompt('Copie o link abaixo:', link);
+  }
+});
+
+/* ===================== Orquestração ===================== */
+function applyFilters(resetSort){
+  const data = getFilteredData();
+  const kpis = computeKPIs(data, DATASET.length);
+  renderKPIs(kpis);
+  renderVolumeChart(computeVolumePorDia(data));
+  renderStatusChart(computeStatusDist(data));
+  renderPerfilChart(computePerfilDist(data));
+  renderTipoChart(computeTipoTop(data));
+  renderRanking(computeRanking(data));
+  renderAlerts(computeAlerts(data));
+  document.getElementById('footer-count').textContent =
+    `Exibindo ${data.length.toLocaleString('pt-BR')} de ${DATASET.length.toLocaleString('pt-BR')} consultas carregadas.`;
+}
+
+const AUTO_REFRESH_MS = 300000;
+let autoRefreshTimer = null;
+
+function scheduleAutoRefresh(){
+  if(autoRefreshTimer){ clearInterval(autoRefreshTimer); }
+  autoRefreshTimer = setInterval(() => {
+    console.log('[Torre] Atualização automática da API...');
+    init();
+  }, AUTO_REFRESH_MS);
+}
+
+/* ===================== Init ===================== */
+init();
+document.getElementById('refresh-btn').addEventListener('click', init);
+
+async function init(){
+  document.getElementById('updated-label').textContent = 'buscando dados na API…';
+  let source = null;
+  if(API_URL && !API_URL.startsWith('COLE_AQUI')){
+    try{
+      source = await loadFromAPI();
+    }catch(err){
+      console.error('Falha na API:', err);
+
+      if(FORCE_LOCAL_TEST_DATA){
+        source = loadEmbeddedData();
+        showToast(
+          (err.message || 'Não foi possível buscar os dados na API.') +
+          ' · usando dados locais embutidos.'
+        );
+      } else {
+        // Não mascarar uma falha de integração como se fosse uma base vazia.
+        // O painel permanece funcional, mas o status deixa claro que a fonte
+        // não foi carregada.
+        source = {
+          tuples: [],
+          label: 'API indisponível · nenhum dado carregado',
+          fetchedAt: null,
+          sources: []
+        };
+
+        const detalhe = err && err.message
+          ? err.message
+          : 'Não foi possível buscar os dados na API.';
+
+        showToast('Falha na API: ' + detalhe);
+      }
+    }
+  } else {
+    source = FORCE_LOCAL_TEST_DATA ? loadEmbeddedData() : { tuples: [], label: 'API indisponível', fetchedAt: null, sources: [] };
+  }
+  applyDataset(source);
+  buildFilterOptions();
+  const anoAtual = String(new Date().getFullYear());
+  const filtroAno = document.getElementById('f-ano');
+  if(Array.from(filtroAno.options).some(option => option.value === anoAtual)){
+    filtroAno.value = anoAtual;
+  }
+  const clienteDaURL = getClienteFromURL();
+  if(clienteDaURL){
+    const sel = document.getElementById('f-cliente');
+    const match = Array.from(sel.options).some(o => o.value === clienteDaURL);
+    if(match) sel.value = clienteDaURL;
+  }
+  applyFilters();
+  scheduleAutoRefresh();
+}
+
+</script>
+<script>
+  const themeToggle = document.getElementById('theme-toggle');
+  document.documentElement.dataset.theme = localStorage.getItem('torre-theme') || 'dark';
+  function updateThemeButton(){ themeToggle.textContent = document.documentElement.dataset.theme === 'dark' ? 'Tema claro' : 'Tema escuro'; }
+  themeToggle.addEventListener('click', () => { document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; localStorage.setItem('torre-theme', document.documentElement.dataset.theme); updateThemeButton(); });
+  updateThemeButton();
+</script>
+</body>
+</html>
