@@ -962,7 +962,7 @@ async function loadFromAPI(){
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 180000);
+  const timeoutId = setTimeout(() => controller.abort(), 600000);
 
   try {
     const res = await fetch(API_URL, {
