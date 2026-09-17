@@ -1016,8 +1016,9 @@ async function loadFromAPI(){
     });
   }
 
+  const API_TIMEOUT_MS = 120000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 600000);
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const res = await fetch(API_URL, { redirect:'follow', cache:'no-store', signal: controller.signal });
     if(!res.ok) throw new Error('HTTP ' + res.status);
