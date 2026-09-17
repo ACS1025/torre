@@ -815,6 +815,8 @@ let RAW_SNAPSHOT = null; // último payload completo da API, com TODAS as coluna
 // A fonte principal de dados é a API; o fallback offline só deve ser usado se a API falhar.
 const API_URL = 'https://script.google.com/macros/s/AKfycbyMQgjPNQ7fcJgEezUHm3rd699qoqC0bXWuEVHDZHDVGvb2as45fy5TwLp1o4eJcB6v/exec';
 const FORCE_LOCAL_TEST_DATA = new URLSearchParams(window.location.search).get('localData') === '1';
+const API_TIMEOUT_MS = 300000;
+const DATA_CACHE_KEY = 'torre-analise-veiculo-cache-v1';
 
 const STATUS_COLORS = {
   'Apto': getVar('--apto'),
@@ -1132,7 +1134,6 @@ async function loadFromAPI(){
     });
   }
 
-  const API_TIMEOUT_MS = 120000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
@@ -1180,6 +1181,36 @@ async function loadFromAPI(){
     throw err;
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+function loadCachedSource(){
+  try{
+    const cached = JSON.parse(localStorage.getItem(DATA_CACHE_KEY) || 'null');
+    if(!cached || !Array.isArray(cached.tuples) || !cached.tuples.length) return null;
+    return {
+      tuples: cached.tuples,
+      label: (cached.label || 'Última atualização local') + ' · dados salvos neste navegador',
+      fetchedAt: cached.fetchedAt || null,
+      sources: cached.sources || []
+    };
+  }catch(err){
+    console.warn('Não foi possível ler o cache local:', err);
+    return null;
+  }
+}
+
+function saveCachedSource(source){
+  if(!source || !Array.isArray(source.tuples) || !source.tuples.length) return;
+  try{
+    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({
+      tuples: source.tuples,
+      label: source.label,
+      fetchedAt: source.fetchedAt || new Date().toISOString(),
+      sources: source.sources || []
+    }));
+  }catch(err){
+    console.warn('Não foi possível salvar o cache local:', err);
   }
 }
 
@@ -1721,11 +1752,21 @@ init();
 document.getElementById('refresh-btn').addEventListener('click', init);
 
 async function init(){
+  if(!DATASET.length){
+    const cachedSource = loadCachedSource();
+    if(cachedSource){
+      applyDataset(cachedSource);
+      buildFilterOptions();
+      applyFilters();
+    }
+  }
+  const previousUpdateLabel = document.getElementById('updated-label').textContent;
   document.getElementById('updated-label').textContent = 'buscando dados na API…';
   let source = null;
   if(API_URL && !API_URL.startsWith('COLE_AQUI')){
     try{
       source = await loadFromAPI();
+      saveCachedSource(source);
     }catch(err){
       console.error('Falha na API:', err);
 
@@ -1739,12 +1780,7 @@ async function init(){
         // Não mascarar uma falha de integração como se fosse uma base vazia.
         // O painel permanece funcional, mas o status deixa claro que a fonte
         // não foi carregada.
-        source = {
-          tuples: [],
-          label: 'API indisponível · nenhum dado carregado',
-          fetchedAt: null,
-          sources: []
-        };
+        source = DATASET.length ? null : loadCachedSource();
 
         const detalhe = err && err.message
           ? err.message
@@ -1754,9 +1790,10 @@ async function init(){
       }
     }
   } else {
-    source = FORCE_LOCAL_TEST_DATA ? loadEmbeddedData() : { tuples: [], label: 'API indisponível', fetchedAt: null, sources: [] };
+    source = FORCE_LOCAL_TEST_DATA ? loadEmbeddedData() : (DATASET.length ? null : loadCachedSource());
   }
-  applyDataset(source);
+  if(source) applyDataset(source);
+  else document.getElementById('updated-label').textContent = previousUpdateLabel + ' · API indisponível; mantendo última atualização';
   buildFilterOptions();
   const anoAtual = String(new Date().getFullYear());
   const filtroAno = document.getElementById('f-ano');
