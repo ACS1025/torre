@@ -125,6 +125,20 @@
     padding:16px;
     align-items:start;
   }
+  .app-shell.nav-collapsed{grid-template-columns:0 1fr var(--toolsbar-w); gap:8px;}
+  .app-shell.tools-collapsed{grid-template-columns:var(--sidebar-w) 1fr 0; gap:8px;}
+  .app-shell.nav-collapsed.tools-collapsed{grid-template-columns:0 1fr 0;}
+  .nav-collapsed .nav-sidebar,
+  .tools-collapsed .tools-sidebar{
+    width:0;
+    min-width:0;
+    padding-left:0;
+    padding-right:0;
+    border-width:0;
+    opacity:0;
+    overflow:hidden;
+    pointer-events:none;
+  }
   .nav-overlay{
     display:none; position:fixed; inset:0;
     background:rgba(3,6,9,0.55); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
@@ -144,12 +158,13 @@
   }
   .topbar-left{ display:flex; align-items:center; gap:14px; min-width:0; }
   .nav-toggle{
-    display:none; background:var(--glass-fill); border:1px solid var(--glass-border);
+    display:flex; background:var(--glass-fill); border:1px solid var(--glass-border);
     color:var(--text-muted); width:36px; height:36px; border-radius:var(--radius-sm);
     cursor:pointer; align-items:center; justify-content:center; flex-shrink:0;
     backdrop-filter:blur(var(--blur));
   }
   .nav-toggle svg{ width:17px; height:17px; }
+  .tools-toggle{padding:9px 12px;}
   header.topbar .title-block h1{
     font-size:28px;
     letter-spacing:0.2px;
@@ -678,6 +693,7 @@
         </div>
       </div>
       <div class="actions">
+        <button class="tools-toggle" id="tools-toggle" type="button" title="Mostrar ou ocultar ferramentas" aria-label="Mostrar ou ocultar ferramentas">Ferramentas</button>
         <button id="refresh-btn" title="Buscar novamente os dados da API">&#8635; Atualizar</button>
         <button id="export-btn">Exportar CSV mensal</button>
         <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Alternar tema">Tema claro</button>
@@ -778,6 +794,10 @@
   </div>
 
   <aside class="tools-sidebar">
+    <button class="tool-btn" id="tools-hide" type="button" title="Ocultar ferramentas" aria-label="Ocultar ferramentas">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
+      <span>Ocultar</span>
+    </button>
     <div class="tools-label">Ferramentas</div>
     <a class="tool-btn" href="index.html">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M9.5 19.5v-6h5v6"/></svg>
@@ -1559,6 +1579,7 @@ async function init(){
 }
 </script>
 <script>
+  const appShell = document.querySelector('.app-shell');
   const themeToggle = document.getElementById('theme-toggle');
   document.documentElement.dataset.theme = localStorage.getItem('torre-theme') || 'dark';
   function updateThemeButton(){ themeToggle.textContent = document.documentElement.dataset.theme === 'dark' ? 'Tema claro' : 'Tema escuro'; }
@@ -1570,9 +1591,27 @@ async function init(){
   const navToggle = document.getElementById('navToggle');
   const navClose = document.getElementById('navClose');
   const navOverlay = document.getElementById('navOverlay');
+  const toolsToggle = document.getElementById('tools-toggle');
+  const toolsHide = document.getElementById('tools-hide');
   function openNav(){ navSidebar.classList.add('open'); navOverlay.classList.add('open'); navToggle.setAttribute('aria-expanded','true'); }
   function closeNav(){ navSidebar.classList.remove('open'); navOverlay.classList.remove('open'); navToggle.setAttribute('aria-expanded','false'); }
-  navToggle.addEventListener('click', openNav);
+  function toggleNav(){
+    if(window.innerWidth <= 900){
+      navSidebar.classList.contains('open') ? closeNav() : openNav();
+      return;
+    }
+    const collapsed = appShell.classList.toggle('nav-collapsed');
+    navToggle.setAttribute('aria-label', collapsed ? 'Mostrar menu' : 'Ocultar menu');
+    navToggle.setAttribute('aria-expanded', String(!collapsed));
+  }
+  function toggleTools(){
+    const collapsed = appShell.classList.toggle('tools-collapsed');
+    toolsToggle.textContent = collapsed ? 'Ferramentas' : 'Ocultar ferramentas';
+    toolsToggle.setAttribute('aria-label', collapsed ? 'Mostrar ferramentas' : 'Ocultar ferramentas');
+  }
+  navToggle.addEventListener('click', toggleNav);
+  toolsToggle.addEventListener('click', toggleTools);
+  toolsHide.addEventListener('click', toggleTools);
   navClose.addEventListener('click', closeNav);
   navOverlay.addEventListener('click', closeNav);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNav(); });
