@@ -13,6 +13,18 @@
   color:var(--text);
 }
 html[data-theme="light"] .legacy-page{--modern-bg:#e9eef1;--modern-panel:rgba(255,255,255,.76);--modern-panel-strong:rgba(255,255,255,.94);--modern-border:rgba(34,56,75,.14);--modern-border-strong:rgba(34,56,75,.25);--modern-shadow:0 20px 50px rgba(43,61,78,.14)}
+.legacy-page,
+.legacy-page button,
+.legacy-page select,
+.legacy-page input,
+.legacy-page textarea{color:var(--text)}
+.legacy-page button,
+.legacy-page select,
+.legacy-page input,
+.legacy-page textarea{background:var(--glass-fill-strong)}
+.legacy-page .tool-btn svg,
+.legacy-page .nav-toggle svg,
+.legacy-page .nav-close svg{stroke:var(--text-muted)}
 .legacy-page .shell,.legacy-page .app-shell{gap:16px;padding:16px;min-height:100vh}
 .legacy-page .nav-sidebar,.legacy-page .tools-sidebar,.legacy-page .panel,.legacy-page .kpi,.legacy-page .grid,.legacy-page .filters,.legacy-page .topbar,.legacy-page .kpis{
   border-color:var(--modern-border);

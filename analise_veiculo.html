@@ -1500,7 +1500,7 @@ function destroyChart(key){
 
 const CHART_FONT = { family:"'IBM Plex Mono', monospace", size:11 };
 const GRID_COLOR = 'rgba(255,255,255,0.06)';
-const MUTED = getVar('--text-muted');
+let MUTED = getVar('--text-muted');
 
 function renderVolumeChart(agg){
   destroyChart('volume');
@@ -1835,7 +1835,19 @@ async function init(){
   const themeToggle = document.getElementById('theme-toggle');
   document.documentElement.dataset.theme = localStorage.getItem('torre-theme') || 'dark';
   function updateThemeButton(){ themeToggle.textContent = document.documentElement.dataset.theme === 'dark' ? 'Tema claro' : 'Tema escuro'; }
-  themeToggle.addEventListener('click', () => { document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; localStorage.setItem('torre-theme', document.documentElement.dataset.theme); updateThemeButton(); });
+  themeToggle.addEventListener('click', () => {
+    document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('torre-theme', document.documentElement.dataset.theme);
+    MUTED = getVar('--text-muted');
+    Object.assign(STATUS_COLORS, {
+      'Apto': getVar('--apto'),
+      'Avaliação concluída': getVar('--avaliacao'),
+      'Consulta vencida': getVar('--vencida'),
+      'Aguardando': getVar('--aguardando')
+    });
+    updateThemeButton();
+    applyFilters();
+  });
   updateThemeButton();
 </script>
 <script>
