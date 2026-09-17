@@ -713,14 +713,7 @@
       <div class="col-left">
         <div class="panel">
           <div class="panel-head">
-            <h2>Evolução mensal de consultas</h2>
-            <span class="note" id="evolution-note"></span>
-          </div>
-          <div class="chart-wrap tall"><canvas id="chart-evolution"></canvas></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head">
-            <h2>Consultas por status (mensal)</h2>
+            <h2>Evolução mensal por status</h2>
             <span class="note" id="status-note"></span>
           </div>
           <div class="chart-wrap tall"><canvas id="chart-status-month"></canvas></div>
@@ -811,6 +804,7 @@ let CHARTS = {};
 let DEDUP_REMOVED = 0;
 let RAW_SNAPSHOT = null;
 let MONTHLY_CACHE = [];
+let FIRST_LOAD = true;  // garante que filtros padrão/URL só se aplicam uma vez
 
 /* ===================== Configuração da API ===================== */
 const API_URL = 'https://script.google.com/macros/s/AKfycbyMQgjPNQ7fcJgEezUHm3rd699qoqC0bXWuEVHDZHDVGvb2as45fy5TwLp1o4eJcB6v/exec';
@@ -1178,26 +1172,6 @@ function computeMonthly(data){
   }));
 }
 
-function monthlyByClient(data, topN){
-  const totals = {};
-  for(const d of data){
-    if(!d.consultaDate || !d.cliente) continue;
-    totals[d.cliente] = (totals[d.cliente]||0) + 1;
-  }
-  return Object.keys(totals).sort((a,b)=>totals[b]-totals[a]).slice(0, topN);
-}
-
-function computeClientMonthlySeries(data, cliente, months){
-  const values = new Array(months.length).fill(0);
-  for(const d of data){
-    if(d.cliente !== cliente || !d.consultaDate) continue;
-    const k = monthKey(d.consultaDate);
-    const i = months.indexOf(k);
-    if(i > -1) values[i]++;
-  }
-  return values;
-}
-
 function countBy(data, keyFn){
   const out = {};
   for(const d of data){ const k = keyFn(d); out[k] = (out[k]||0) + 1; }
@@ -1294,89 +1268,17 @@ const PCT_LABEL_STYLE = {
   formatter: v => v == null ? '' : v.toFixed(0) + '%'
 };
 
-function renderEvolutionChart(data, monthly, clienteSelecionado){
-  destroyChart('evolution');
-  const ctx = document.getElementById('chart-evolution');
-  const labels = monthly.map(m => m.label);
-  const datasets = [];
-
-  if(clienteSelecionado){
-    datasets.push({
-      label: 'Consultas',
-      data: monthly.map(m => m.total),
-      borderColor: getVar('--accent'),
-      backgroundColor: 'rgba(102,174,219,0.12)',
-      borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: getVar('--accent'),
-      tension: 0.3, fill: true, yAxisID: 'y',
-      datalabels: LABEL_STYLE
-    });
-    datasets.push({
-      label: '% vencida',
-      data: monthly.map(m => +m.vencidaPct.toFixed(1)),
-      borderColor: getVar('--vencida'),
-      backgroundColor: getVar('--vencida'),
-      borderDash: [5,4], borderWidth: 1.8, pointRadius: 2.5, fill: false,
-      tension: 0.3, yAxisID: 'y1',
-      datalabels: PCT_LABEL_STYLE
-    });
-    document.getElementById('evolution-note').textContent = clienteSelecionado.slice(0, 34);
-  } else {
-    const months = monthly.map(m => m.key);
-    const top = monthlyByClient(data, 6);
-    const palette = [getVar('--accent'), getVar('--vencida'), getVar('--avaliacao'), getVar('--apto'), getVar('--critical'), getVar('--aguardando')];
-    top.forEach((c, i) => {
-      datasets.push({
-        label: c.length > 22 ? c.slice(0, 22) + '…' : c,
-        data: computeClientMonthlySeries(data, c, months),
-        borderColor: palette[i % palette.length],
-        backgroundColor: palette[i % palette.length],
-        borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false,
-        datalabels: { display: false }
-      });
-    });
-    datasets.push({
-      label: 'Total',
-      data: monthly.map(m => m.total),
-      borderColor: getVar('--text-muted'),
-      backgroundColor: 'rgba(148,162,175,0.08)',
-      borderWidth: 1.4, borderDash: [3,4], pointRadius: 0, tension: 0.3, fill: false,
-      datalabels: { display: false }
-    });
-    document.getElementById('evolution-note').textContent = 'top 6 clientes + total';
-  }
-
-  const scales = {
-    x: { ticks: { color: MUTED, font: CHART_FONT, maxRotation: 0 }, grid: { color: GRID_COLOR } }
-  };
-  CHARTS.evolution = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { position: 'bottom', labels: { color: MUTED, font: { family:"'IBM Plex Sans', sans-serif", size:11 }, boxWidth: 10, padding: 12 } },
-        tooltip: { mode: 'index', intersect: false }
-      },
-      scales: scales
-    }
-  });
-  scales.y = { position: 'left', beginAtZero: true, ticks: { color: MUTED, font: CHART_FONT, precision: 0 }, grid: { color: GRID_COLOR }, title: { display: !!clienteSelecionado, text: 'consultas', color: MUTED, font: CHART_FONT } };
-  if(clienteSelecionado){
-    scales.y1 = { position: 'right', beginAtZero: true, max: 100, ticks: { color: getVar('--vencida'), font: CHART_FONT, callback: v => v + '%' }, grid: { drawOnChartArea: false }, title: { display: true, text: '% vencida', color: getVar('--vencida'), font: CHART_FONT } };
-  }
-  CHARTS.evolution.update();
-}
-
 function renderStatusMonthChart(monthly){
   destroyChart('statusMonth');
+  const BAR_LABEL = { color: getVar('--text'), font: { family:"'IBM Plex Mono', monospace", size:9 }, anchor: 'end', align: 'top', offset: 2, clamp: true };
   const ctx = document.getElementById('chart-status-month');
   const mk = (key, label, colorVar) => ({
     label,
     data: monthly.map(m => m[key]),
     backgroundColor: getVar(colorVar),
-    stack: 's',
-    datalabels: { display: false }
+    borderRadius: 2,
+    maxBarThickness: 18,
+    datalabels: BAR_LABEL
   });
   CHARTS.statusMonth = new Chart(ctx, {
     type: 'bar',
@@ -1396,8 +1298,8 @@ function renderStatusMonthChart(monthly){
         tooltip: { mode: 'index', intersect: false }
       },
       scales: {
-        x: { stacked: true, ticks: { color: MUTED, font: CHART_FONT, maxRotation: 0 }, grid: { display: false } },
-        y: { stacked: true, beginAtZero: true, ticks: { color: MUTED, font: CHART_FONT, precision: 0 }, grid: { color: GRID_COLOR } }
+        x: { ticks: { color: MUTED, font: CHART_FONT, maxRotation: 0 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: MUTED, font: CHART_FONT, precision: 0 }, grid: { color: GRID_COLOR } }
       }
     }
   });
@@ -1561,7 +1463,6 @@ function applyFilters(){
   const cliente = document.getElementById('f-cliente').value;
   const monthly = computeMonthly(data);
   renderKPIs(computeKPIs(data, monthly));
-  renderEvolutionChart(data, monthly, cliente);
   renderStatusMonthChart(monthly);
   renderPerfilChart(data);
   renderTipoChart(data);
@@ -1597,17 +1498,18 @@ async function init(){
     source = { tuples: [], label: 'API indisponível', fetchedAt: null, sources: [] };
   }
   applyDataset(source);
+  // Reconstrói as opções preservando o que o usuário já havia selecionado.
   buildFilterOptions();
-  const anoAtual = String(new Date().getFullYear());
-  const filtroAno = document.getElementById('f-ano');
-  if(Array.from(filtroAno.options).some(option => option.value === anoAtual)){
-    filtroAno.value = anoAtual;
-  }
-  const clienteDaURL = getClienteFromURL();
-  if(clienteDaURL){
-    const sel = document.getElementById('f-cliente');
-    const match = Array.from(sel.options).some(o => o.value === clienteDaURL);
-    if(match) sel.value = clienteDaURL;
+  if(FIRST_LOAD){
+    // Tela abre limpa: nenhum filtro pré-aplicado. Apenas o parâmetro ?cliente=
+    // da URL (convenção de navegação) é honrado nesta primeira carga.
+    const clienteDaURL = getClienteFromURL();
+    if(clienteDaURL){
+      const sel = document.getElementById('f-cliente');
+      const match = Array.from(sel.options).some(o => o.value === clienteDaURL);
+      if(match) sel.value = clienteDaURL;
+    }
+    FIRST_LOAD = false;
   }
   applyFilters();
   scheduleAutoRefresh();
